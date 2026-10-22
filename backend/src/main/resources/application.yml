@@ -1,3 +1,7 @@
+server:
+  # Render and most PaaS hosts pass the port to listen on
+  port: ${PORT:8080}
+
 spring:
   application:
     name: coffee-duty
@@ -17,3 +21,9 @@ app:
   zone: Asia/Seoul
   cors:
     allowed-origins: http://localhost:3000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

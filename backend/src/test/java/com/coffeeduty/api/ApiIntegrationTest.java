@@ -333,6 +333,13 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void exposesHealthForThePlatformCheck() throws Exception {
+        mvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void allowsTheFrontendOrigin() throws Exception {
         mvc.perform(get("/api/members").header("Origin", "http://localhost:3000"))
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));

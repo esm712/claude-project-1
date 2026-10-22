@@ -3,6 +3,9 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      # free-tier Postgres poolers allow few connections, and three people need very few
+      maximum-pool-size: 5
 
 app:
   cors:

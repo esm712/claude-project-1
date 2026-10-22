@@ -1,0 +1,19 @@
+name: Keep backend awake
+
+# Render's free plan sleeps after 15 idle minutes and Supabase's free plan pauses after a week
+# without activity. Pinging the health check (which also queries the DB) during working hours
+# avoids a cold start when someone opens the app. Set the BACKEND_URL repository variable to enable.
+on:
+  schedule:
+    # every 10 minutes, 08:00-19:59 KST (23:00-10:59 UTC), Mon-Fri KST
+    - cron: "*/10 23 * * 0-4"
+    - cron: "*/10 0-10 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    if: vars.BACKEND_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health check
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 20 --max-time 90 "${{ vars.BACKEND_URL }}/actuator/health"
