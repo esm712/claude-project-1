@@ -1,17 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPurchase, deletePurchase, fetchDuty, fetchMembers, fetchPurchases, updatePurchase } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createMember,
+  createPurchase,
+  deletePurchase,
+  fetchDuty,
+  fetchMembers,
+  fetchPurchases,
+  updateMember,
+  updatePurchase,
+} from "@/lib/api";
 import { errorMessage, todayIso } from "@/lib/format";
 import type { Duty, Member, Purchase, PurchaseInput } from "@/lib/types";
 import { AttendancePicker } from "./AttendancePicker";
 import { DutyCard } from "./DutyCard";
+import { MemberManager } from "./MemberManager";
 import { PurchaseForm } from "./PurchaseForm";
 import { PurchaseHistory } from "./PurchaseHistory";
 import { StandingsTable } from "./StandingsTable";
 
 export function CoffeeDutyApp() {
-  const [members, setMembers] = useState<Member[] | null>(null);
+  const [allMembers, setAllMembers] = useState<Member[] | null>(null);
+  const members = useMemo(() => allMembers?.filter((m) => m.active) ?? null, [allMembers]);
   const [presentIds, setPresentIds] = useState<number[]>([]);
   const [duty, setDuty] = useState<Duty | null>(null);
   const [purchases, setPurchases] = useState<Purchase[] | null>(null);
@@ -23,11 +34,11 @@ export function CoffeeDutyApp() {
 
   useEffect(() => {
     let ignore = false;
-    fetchMembers()
+    fetchMembers(true)
       .then((loaded) => {
         if (ignore) return;
-        setMembers(loaded);
-        setPresentIds(loaded.map((m) => m.id));
+        setAllMembers(loaded);
+        setPresentIds(loaded.filter((m) => m.active).map((m) => m.id));
       })
       .catch((e: unknown) => {
         if (!ignore) setError(errorMessage(e));
@@ -69,6 +80,36 @@ export function CoffeeDutyApp() {
     };
   }, [version]);
 
+  function replaceMember(updated: Member) {
+    setAllMembers((list) => list?.map((m) => (m.id === updated.id ? updated : m)) ?? null);
+  }
+
+  function setPresent(id: number, present: boolean) {
+    setPresentIds((ids) => {
+      const rest = ids.filter((i) => i !== id);
+      return present ? [...rest, id].sort((a, b) => a - b) : rest;
+    });
+  }
+
+  async function addMember(name: string) {
+    const created = await createMember(name);
+    setAllMembers((list) => [...(list ?? []), created]);
+    setPresent(created.id, true);
+    setNotice(`${created.name}님을 추가했어요.`);
+  }
+
+  async function renameMember(id: number, name: string) {
+    replaceMember(await updateMember(id, { name }));
+    setVersion((v) => v + 1);
+  }
+
+  async function setMemberActive(id: number, active: boolean) {
+    const updated = await updateMember(id, { active });
+    replaceMember(updated);
+    setPresent(id, active);
+    setNotice(`${updated.name}님을 ${active ? "다시 활성화" : "비활성화"}했어요.`);
+  }
+
   async function editPurchase(id: number, input: PurchaseInput) {
     await updatePurchase(id, input);
     setNotice("기록을 수정했어요.");
@@ -103,9 +144,15 @@ export function CoffeeDutyApp() {
         </p>
       )}
 
+      {notice && (
+        <p role="status" className="rounded-lg bg-green-100 px-4 py-3 text-sm text-green-900 dark:bg-green-950 dark:text-green-200">
+          {notice}
+        </p>
+      )}
+
       {members === null && !error && <p>불러오는 중…</p>}
 
-      {members !== null && members.length === 0 && <p>아직 등록된 멤버가 없어요. 먼저 멤버를 추가해 주세요.</p>}
+      {members !== null && members.length === 0 && <p>아직 등록된 멤버가 없어요. 아래에서 멤버를 추가해 주세요.</p>}
 
       {members !== null && members.length > 0 && (
         <>
@@ -113,11 +160,6 @@ export function CoffeeDutyApp() {
           {duty && (
             <>
               <DutyCard duty={duty} />
-              {notice && (
-                <p role="status" className="rounded-lg bg-green-100 px-4 py-3 text-sm text-green-900 dark:bg-green-950 dark:text-green-200">
-                  {notice}
-                </p>
-              )}
               {recording ? (
                 <PurchaseForm
                   members={members}
@@ -155,6 +197,15 @@ export function CoffeeDutyApp() {
             />
           )}
         </>
+      )}
+
+      {allMembers !== null && (
+        <details open={allMembers.length === 0} className="rounded-xl border border-black/10 p-4 dark:border-white/15">
+          <summary className="cursor-pointer font-semibold">멤버 관리</summary>
+          <div className="mt-3">
+            <MemberManager members={allMembers} onAdd={addMember} onRename={renameMember} onSetActive={setMemberActive} />
+          </div>
+        </details>
       )}
     </main>
   );

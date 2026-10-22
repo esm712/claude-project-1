@@ -13,6 +13,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     fetchMembers: vi.fn(),
     fetchDuty: vi.fn(),
     fetchPurchases: vi.fn(),
+    createMember: vi.fn(),
+    updateMember: vi.fn(),
     createPurchase: vi.fn(),
     updatePurchase: vi.fn(),
     deletePurchase: vi.fn(),
@@ -23,6 +25,8 @@ const fetchMembers = vi.mocked(api.fetchMembers);
 const fetchDuty = vi.mocked(api.fetchDuty);
 const createPurchase = vi.mocked(api.createPurchase);
 const fetchPurchases = vi.mocked(api.fetchPurchases);
+const createMember = vi.mocked(api.createMember);
+const updateMember = vi.mocked(api.updateMember);
 const updatePurchase = vi.mocked(api.updatePurchase);
 const deletePurchase = vi.mocked(api.deletePurchase);
 
@@ -31,6 +35,8 @@ beforeEach(() => {
   createPurchase.mockReset();
   fetchPurchases.mockReset().mockResolvedValue([]);
   updatePurchase.mockReset();
+  createMember.mockReset();
+  updateMember.mockReset();
   deletePurchase.mockReset();
   fetchDuty.mockReset().mockImplementation(async (present = [1, 2, 3]) => duty(present.length >= 2 ? present[0] : null, present));
 });
@@ -41,6 +47,16 @@ describe("CoffeeDutyApp", () => {
 
     expect(await screen.findByRole("region", { name: "오늘의 당번" })).toHaveTextContent("철수");
     expect(fetchDuty).toHaveBeenLastCalledWith([1, 2, 3]);
+    expect(fetchMembers).toHaveBeenCalledWith(true);
+  });
+
+  it("leaves inactive members out of today's attendance", async () => {
+    fetchMembers.mockResolvedValue([members[0], { ...members[1], active: false }, members[2]]);
+    render(<CoffeeDutyApp />);
+
+    await screen.findByRole("region", { name: "오늘의 당번" });
+    expect(fetchDuty).toHaveBeenLastCalledWith([1, 3]);
+    expect(screen.queryByRole("checkbox", { name: "영희" })).not.toBeInTheDocument();
   });
 
   it("recomputes the duty when someone is marked absent", async () => {
@@ -232,6 +248,70 @@ describe("CoffeeDutyApp", () => {
         purchasedAt: "2026-10-21",
       });
       expect(await screen.findByRole("status")).toHaveTextContent("기록을 수정했어요.");
+    });
+  });
+
+  describe("member management", () => {
+    it("opens member management when there are no members yet", async () => {
+      fetchMembers.mockResolvedValue([]);
+      render(<CoffeeDutyApp />);
+
+      await screen.findByText(/아직 등록된 멤버가 없어요/);
+      expect(screen.getByRole("textbox", { name: "새 멤버 이름" })).toBeVisible();
+    });
+
+    it("marks a newly added member present and recomputes the duty", async () => {
+      createMember.mockResolvedValue({ id: 4, name: "지수", active: true });
+      render(<CoffeeDutyApp />);
+      await screen.findByRole("region", { name: "오늘의 당번" });
+
+      await userEvent.click(screen.getByText("멤버 관리"));
+      await userEvent.type(screen.getByRole("textbox", { name: "새 멤버 이름" }), "지수");
+      await userEvent.click(screen.getByRole("button", { name: "추가" }));
+
+      expect(createMember).toHaveBeenCalledWith("지수");
+      expect(await screen.findByRole("checkbox", { name: "지수" })).toBeChecked();
+      await waitFor(() => expect(fetchDuty).toHaveBeenLastCalledWith([1, 2, 3, 4]));
+      expect(screen.getByRole("status")).toHaveTextContent("지수님을 추가했어요.");
+    });
+
+    it("drops a deactivated member from attendance and brings them back when reactivated", async () => {
+      updateMember
+        .mockResolvedValueOnce({ id: 2, name: "영희", active: false })
+        .mockResolvedValueOnce({ id: 2, name: "영희", active: true });
+      render(<CoffeeDutyApp />);
+      await screen.findByRole("region", { name: "오늘의 당번" });
+      await userEvent.click(screen.getByText("멤버 관리"));
+      const manager = screen.getByRole("region", { name: "멤버 관리" });
+
+      await userEvent.click(within(within(manager).getByRole("listitem", { name: "영희" })).getByRole("button", { name: "비활성화" }));
+
+      expect(updateMember).toHaveBeenCalledWith(2, { active: false });
+      await waitFor(() => expect(fetchDuty).toHaveBeenLastCalledWith([1, 3]));
+      expect(screen.queryByRole("checkbox", { name: "영희" })).not.toBeInTheDocument();
+
+      await userEvent.click(within(within(manager).getByRole("listitem", { name: "영희" })).getByRole("button", { name: "다시 활성화" }));
+
+      await waitFor(() => expect(fetchDuty).toHaveBeenLastCalledWith([1, 2, 3]));
+      expect(screen.getByRole("checkbox", { name: "영희" })).toBeChecked();
+    });
+
+    it("reloads names everywhere after a rename", async () => {
+      updateMember.mockResolvedValue({ id: 1, name: "철수킴", active: true });
+      render(<CoffeeDutyApp />);
+      await screen.findByRole("region", { name: "오늘의 당번" });
+      const dutyCalls = fetchDuty.mock.calls.length;
+      const purchaseCalls = fetchPurchases.mock.calls.length;
+      await userEvent.click(screen.getByText("멤버 관리"));
+
+      await userEvent.click(within(screen.getByRole("listitem", { name: "철수" })).getByRole("button", { name: "이름 변경" }));
+      await userEvent.clear(screen.getByRole("textbox", { name: "새 이름" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "새 이름" }), "철수킴");
+      await userEvent.click(screen.getByRole("button", { name: "저장" }));
+
+      expect(await screen.findByRole("checkbox", { name: "철수킴" })).toBeInTheDocument();
+      await waitFor(() => expect(fetchDuty.mock.calls.length).toBeGreaterThan(dutyCalls));
+      expect(fetchPurchases.mock.calls.length).toBeGreaterThan(purchaseCalls);
     });
   });
 });
