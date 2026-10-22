@@ -311,6 +311,15 @@ class ApiIntegrationTest {
         }
 
         @Test
+        void emptyAttendanceMeansNobodyIsInNotEveryone() throws Exception {
+            mvc.perform(get("/api/duty?present="))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.nextDuty").value(nullValue()))
+                    .andExpect(jsonPath("$.presentMemberIds", hasSize(0)))
+                    .andExpect(jsonPath("$.standings", hasSize(3)));
+        }
+
+        @Test
         void unknownOrInactivePresentMemberIsRejected() throws Exception {
             mvc.perform(get("/api/duty?present=%d,9999".formatted(a)))
                     .andExpect(status().isBadRequest());
