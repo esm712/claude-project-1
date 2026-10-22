@@ -152,6 +152,7 @@ describe("CoffeeDutyApp", () => {
 
       expect(createPurchase).toHaveBeenCalledWith(expect.objectContaining({ buyerId: 2, participantIds: [2, 3] }));
       expect(await screen.findByRole("status")).toHaveTextContent("영희님이 2잔 산 것을 기록했어요.");
+      expect(document.querySelector("[data-celebration]")).toBeInTheDocument();
       expect(screen.queryByRole("form", { name: "구매 기록" })).not.toBeInTheDocument();
       await waitFor(() => expect(fetchDuty.mock.calls.length).toBeGreaterThan(callsBefore));
       expect(fetchDuty).toHaveBeenLastCalledWith([2, 3]);
@@ -167,6 +168,7 @@ describe("CoffeeDutyApp", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("member 2 is inactive");
       expect(screen.getByRole("form", { name: "구매 기록" })).toBeInTheDocument();
+      expect(document.querySelector("[data-celebration]")).not.toBeInTheDocument();
     });
 
     it("closes the form on cancel without saving", async () => {
@@ -178,6 +180,7 @@ describe("CoffeeDutyApp", () => {
 
       expect(screen.queryByRole("form", { name: "구매 기록" })).not.toBeInTheDocument();
       expect(createPurchase).not.toHaveBeenCalled();
+      expect(document.querySelector("[data-celebration]")).not.toBeInTheDocument();
     });
   });
 

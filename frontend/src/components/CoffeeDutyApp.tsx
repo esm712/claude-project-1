@@ -14,6 +14,7 @@ import {
 import { errorMessage, todayIso } from "@/lib/format";
 import type { Duty, Member, Purchase, PurchaseInput } from "@/lib/types";
 import { AttendancePicker } from "./AttendancePicker";
+import { Celebration } from "./Celebration";
 import { DutyCard } from "./DutyCard";
 import { MemberManager } from "./MemberManager";
 import { PurchaseForm } from "./PurchaseForm";
@@ -30,6 +31,7 @@ export function CoffeeDutyApp() {
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [managingMembers, setManagingMembers] = useState(false);
+  const [celebrations, setCelebrations] = useState(0);
   // bumped after every change so derived data is fetched again
   const [version, setVersion] = useState(0);
 
@@ -128,6 +130,7 @@ export function CoffeeDutyApp() {
     const saved = await createPurchase(input);
     setRecording(false);
     setNotice(`${saved.buyer.name}님이 ${saved.cups}잔 산 것을 기록했어요.`);
+    setCelebrations((n) => n + 1);
     setVersion((v) => v + 1);
   }
 
@@ -139,6 +142,7 @@ export function CoffeeDutyApp() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-8">
       <h1 className="text-2xl font-bold">☕ 커피 당번</h1>
+      <Celebration burst={celebrations} />
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
