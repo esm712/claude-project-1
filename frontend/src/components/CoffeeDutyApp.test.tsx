@@ -8,16 +8,30 @@ import { CoffeeDutyApp } from "./CoffeeDutyApp";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
-  return { ...actual, fetchMembers: vi.fn(), fetchDuty: vi.fn(), createPurchase: vi.fn() };
+  return {
+    ...actual,
+    fetchMembers: vi.fn(),
+    fetchDuty: vi.fn(),
+    fetchPurchases: vi.fn(),
+    createPurchase: vi.fn(),
+    updatePurchase: vi.fn(),
+    deletePurchase: vi.fn(),
+  };
 });
 
 const fetchMembers = vi.mocked(api.fetchMembers);
 const fetchDuty = vi.mocked(api.fetchDuty);
 const createPurchase = vi.mocked(api.createPurchase);
+const fetchPurchases = vi.mocked(api.fetchPurchases);
+const updatePurchase = vi.mocked(api.updatePurchase);
+const deletePurchase = vi.mocked(api.deletePurchase);
 
 beforeEach(() => {
   fetchMembers.mockReset().mockResolvedValue(members);
   createPurchase.mockReset();
+  fetchPurchases.mockReset().mockResolvedValue([]);
+  updatePurchase.mockReset();
+  deletePurchase.mockReset();
   fetchDuty.mockReset().mockImplementation(async (present = [1, 2, 3]) => duty(present.length >= 2 ? present[0] : null, present));
 });
 
@@ -148,6 +162,76 @@ describe("CoffeeDutyApp", () => {
 
       expect(screen.queryByRole("form", { name: "구매 기록" })).not.toBeInTheDocument();
       expect(createPurchase).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("purchase history", () => {
+    const existing: Purchase = {
+      id: 7,
+      buyer: { id: 1, name: "철수" },
+      participants: [
+        { id: 1, name: "철수" },
+        { id: 2, name: "영희" },
+      ],
+      cups: 2,
+      purchasedAt: "2026-10-21",
+      memo: null,
+      createdAt: "2026-10-21T01:00:00Z",
+    };
+
+    it("lists recorded purchases", async () => {
+      fetchPurchases.mockResolvedValue([existing]);
+      render(<CoffeeDutyApp />);
+
+      expect(await screen.findByRole("listitem", { name: "2026-10-21 철수" })).toHaveTextContent("철수님이 2잔");
+    });
+
+    it("reloads history and duty after recording", async () => {
+      createPurchase.mockResolvedValue(existing);
+      render(<CoffeeDutyApp />);
+      await screen.findByText("아직 기록이 없어요.");
+      fetchPurchases.mockResolvedValue([existing]);
+
+      await userEvent.click(screen.getByRole("button", { name: /커피 샀어요/ }));
+      await userEvent.click(screen.getByRole("button", { name: "기록하기" }));
+
+      expect(await screen.findByRole("listitem", { name: "2026-10-21 철수" })).toBeInTheDocument();
+    });
+
+    it("deletes a purchase and refreshes the duty", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      fetchPurchases.mockResolvedValue([existing]);
+      deletePurchase.mockResolvedValue(undefined);
+      render(<CoffeeDutyApp />);
+      const item = await screen.findByRole("listitem", { name: "2026-10-21 철수" });
+      await screen.findByRole("region", { name: "오늘의 당번" });
+      const dutyCalls = fetchDuty.mock.calls.length;
+      fetchPurchases.mockResolvedValue([]);
+
+      await userEvent.click(within(item).getByRole("button", { name: "삭제" }));
+
+      expect(deletePurchase).toHaveBeenCalledWith(7);
+      expect(await screen.findByRole("status")).toHaveTextContent("기록을 삭제했어요.");
+      expect(await screen.findByText("아직 기록이 없어요.")).toBeInTheDocument();
+      expect(fetchDuty.mock.calls.length).toBeGreaterThan(dutyCalls);
+    });
+
+    it("updates a purchase and refreshes", async () => {
+      fetchPurchases.mockResolvedValue([existing]);
+      updatePurchase.mockResolvedValue({ ...existing, buyer: { id: 2, name: "영희" } });
+      render(<CoffeeDutyApp />);
+      const item = await screen.findByRole("listitem", { name: "2026-10-21 철수" });
+
+      await userEvent.click(within(item).getByRole("button", { name: "수정" }));
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "산 사람" }), "영희");
+      await userEvent.click(screen.getByRole("button", { name: "수정하기" }));
+
+      expect(updatePurchase).toHaveBeenCalledWith(7, {
+        buyerId: 2,
+        participantIds: [1, 2],
+        purchasedAt: "2026-10-21",
+      });
+      expect(await screen.findByRole("status")).toHaveTextContent("기록을 수정했어요.");
     });
   });
 });

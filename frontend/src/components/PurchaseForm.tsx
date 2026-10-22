@@ -23,14 +23,14 @@ type Props = {
 
 export function PurchaseForm({ members, initial, today, submitLabel, onSubmit, onCancel }: Props) {
   const [buyerId, setBuyerId] = useState(initial.buyerId);
-  const [others, setOthers] = useState(() => new Set(initial.participantIds.filter((id) => id !== initial.buyerId)));
+  const [drinkers, setDrinkers] = useState(() => new Set(initial.participantIds));
   const [purchasedAt, setPurchasedAt] = useState(initial.purchasedAt);
   const [memo, setMemo] = useState(initial.memo);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // the buyer always drinks too
-  const participantIds = members.map((m) => m.id).filter((id) => id === buyerId || others.has(id));
+  // the buyer always drinks too; changing the buyer does not change who else drank
+  const participantIds = members.map((m) => m.id).filter((id) => id === buyerId || drinkers.has(id));
   const problem =
     participantIds.length < 2
       ? "구매자 말고 함께 마신 사람을 한 명 이상 골라 주세요."
@@ -41,13 +41,13 @@ export function PurchaseForm({ members, initial, today, submitLabel, onSubmit, o
           : null;
 
   function toggle(id: number, checked: boolean) {
-    const next = new Set(others);
+    const next = new Set(drinkers);
     if (checked) {
       next.add(id);
     } else {
       next.delete(id);
     }
-    setOthers(next);
+    setDrinkers(next);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -74,7 +74,11 @@ export function PurchaseForm({ members, initial, today, submitLabel, onSubmit, o
         산 사람
         <select
           value={buyerId}
-          onChange={(e) => setBuyerId(Number(e.target.value))}
+          onChange={(e) => {
+            const id = Number(e.target.value);
+            setBuyerId(id);
+            setDrinkers(new Set(drinkers).add(id));
+          }}
           className="rounded-lg border border-black/15 bg-transparent px-3 py-2 font-normal dark:border-white/20"
         >
           {members.map((m) => (
@@ -92,7 +96,7 @@ export function PurchaseForm({ members, initial, today, submitLabel, onSubmit, o
             <label key={m.id} className="flex items-center gap-1.5">
               <input
                 type="checkbox"
-                checked={m.id === buyerId || others.has(m.id)}
+                checked={m.id === buyerId || drinkers.has(m.id)}
                 disabled={m.id === buyerId}
                 onChange={(e) => toggle(m.id, e.target.checked)}
               />

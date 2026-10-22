@@ -62,7 +62,28 @@ describe("PurchaseForm", () => {
     expect(participant("영희")).toBeChecked();
     expect(participant("영희")).toBeDisabled();
     expect(participant("민수")).toBeEnabled();
+    // the previous buyer still drank
+    expect(participant("민수")).toBeChecked();
     await userEvent.click(submit());
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ buyerId: 2, participantIds: [1, 2, 3] }));
+  });
+
+  it("keeps everyone who drank when the buyer is switched to another drinker", async () => {
+    const { onSubmit } = renderForm({ buyerId: 1, participantIds: [1, 2] });
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "산 사람" }), "영희");
+    await userEvent.click(submit());
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ buyerId: 2, participantIds: [1, 2] }));
+  });
+
+  it("lets the previous buyer be unchecked after switching", async () => {
+    const { onSubmit } = renderForm({ buyerId: 3, participantIds: [1, 2, 3] });
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "산 사람" }), "영희");
+    await userEvent.click(participant("민수"));
+    await userEvent.click(submit());
+
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ buyerId: 2, participantIds: [1, 2] }));
   });
 

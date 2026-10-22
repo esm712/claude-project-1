@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPurchase, fetchDuty, fetchMembers } from "@/lib/api";
+import { createPurchase, deletePurchase, fetchDuty, fetchMembers, fetchPurchases, updatePurchase } from "@/lib/api";
 import { errorMessage, todayIso } from "@/lib/format";
-import type { Duty, Member, PurchaseInput } from "@/lib/types";
+import type { Duty, Member, Purchase, PurchaseInput } from "@/lib/types";
 import { AttendancePicker } from "./AttendancePicker";
 import { DutyCard } from "./DutyCard";
 import { PurchaseForm } from "./PurchaseForm";
+import { PurchaseHistory } from "./PurchaseHistory";
 import { StandingsTable } from "./StandingsTable";
 
 export function CoffeeDutyApp() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [presentIds, setPresentIds] = useState<number[]>([]);
   const [duty, setDuty] = useState<Duty | null>(null);
+  const [purchases, setPurchases] = useState<Purchase[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -52,6 +54,32 @@ export function CoffeeDutyApp() {
       ignore = true;
     };
   }, [members, presentIds, version]);
+
+  useEffect(() => {
+    let ignore = false;
+    fetchPurchases()
+      .then((loaded) => {
+        if (!ignore) setPurchases(loaded);
+      })
+      .catch((e: unknown) => {
+        if (!ignore) setError(errorMessage(e));
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [version]);
+
+  async function editPurchase(id: number, input: PurchaseInput) {
+    await updatePurchase(id, input);
+    setNotice("기록을 수정했어요.");
+    setVersion((v) => v + 1);
+  }
+
+  async function removePurchase(id: number) {
+    await deletePurchase(id);
+    setNotice("기록을 삭제했어요.");
+    setVersion((v) => v + 1);
+  }
 
   async function recordPurchase(input: PurchaseInput) {
     const saved = await createPurchase(input);
@@ -116,6 +144,15 @@ export function CoffeeDutyApp() {
               )}
               <StandingsTable standings={duty.standings} presentIds={presentIds} nextDutyId={duty.nextDuty?.id ?? null} />
             </>
+          )}
+          {purchases && (
+            <PurchaseHistory
+              purchases={purchases}
+              members={members}
+              today={todayIso()}
+              onUpdate={editPurchase}
+              onDelete={removePurchase}
+            />
           )}
         </>
       )}
