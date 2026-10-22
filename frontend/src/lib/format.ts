@@ -18,3 +18,9 @@ export function errorMessage(error: unknown): string {
   }
   return "서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
 }
+
+/** Today in the browser's time zone as yyyy-MM-dd. */
+export function todayIso(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
