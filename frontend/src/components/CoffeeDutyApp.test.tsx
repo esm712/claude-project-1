@@ -260,6 +260,22 @@ describe("CoffeeDutyApp", () => {
       expect(screen.getByRole("textbox", { name: "새 멤버 이름" })).toBeVisible();
     });
 
+    it("keeps member management open while adding the first members", async () => {
+      fetchMembers.mockResolvedValue([]);
+      createMember.mockResolvedValueOnce(members[0]).mockResolvedValueOnce(members[1]);
+      render(<CoffeeDutyApp />);
+      await screen.findByText(/아직 등록된 멤버가 없어요/);
+
+      await userEvent.type(screen.getByRole("textbox", { name: "새 멤버 이름" }), "철수");
+      await userEvent.click(screen.getByRole("button", { name: "추가" }));
+      await screen.findByRole("checkbox", { name: "철수" });
+
+      expect(screen.getByRole("textbox", { name: "새 멤버 이름" })).toBeVisible();
+      await userEvent.type(screen.getByRole("textbox", { name: "새 멤버 이름" }), "영희");
+      await userEvent.click(screen.getByRole("button", { name: "추가" }));
+      expect(await screen.findByRole("checkbox", { name: "영희" })).toBeChecked();
+    });
+
     it("marks a newly added member present and recomputes the duty", async () => {
       createMember.mockResolvedValue({ id: 4, name: "지수", active: true });
       render(<CoffeeDutyApp />);

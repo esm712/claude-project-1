@@ -29,6 +29,7 @@ export function CoffeeDutyApp() {
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [managingMembers, setManagingMembers] = useState(false);
   // bumped after every change so derived data is fetched again
   const [version, setVersion] = useState(0);
 
@@ -39,6 +40,7 @@ export function CoffeeDutyApp() {
         if (ignore) return;
         setAllMembers(loaded);
         setPresentIds(loaded.filter((m) => m.active).map((m) => m.id));
+        setManagingMembers(loaded.length === 0);
       })
       .catch((e: unknown) => {
         if (!ignore) setError(errorMessage(e));
@@ -200,7 +202,10 @@ export function CoffeeDutyApp() {
       )}
 
       {allMembers !== null && (
-        <details open={allMembers.length === 0} className="rounded-xl border border-black/10 p-4 dark:border-white/15">
+        <details
+          open={managingMembers}
+          onToggle={(e) => setManagingMembers(e.currentTarget.open)}
+          className="rounded-xl border border-black/10 p-4 dark:border-white/15">
           <summary className="cursor-pointer font-semibold">멤버 관리</summary>
           <div className="mt-3">
             <MemberManager members={allMembers} onAdd={addMember} onRename={renameMember} onSetActive={setMemberActive} />

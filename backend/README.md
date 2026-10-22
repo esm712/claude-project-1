@@ -21,6 +21,8 @@
 
 운영 환경(PostgreSQL)에서는 `SPRING_PROFILES_ACTIVE=prod`로 실행하고 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`를 설정합니다.
 
+`CORS_ALLOWED_ORIGINS`에는 프론트엔드가 서비스되는 주소를 넣어야 합니다. 프론트엔드가 Next.js rewrite로 요청을 중계하더라도 브라우저의 `Origin` 헤더가 그대로 전달되기 때문입니다.
+
 ## API
 
 | Method | Path | 설명 |
